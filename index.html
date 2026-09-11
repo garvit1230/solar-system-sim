@@ -3,129 +3,179 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>N-Body Astrodynamics & Solar System Projector</title>
+    <title>NASA JPL Ephemeris Astrodynamics & Trajectory Engine</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #010204; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #e2e8f0; }
+        body { margin: 0; overflow: hidden; background: #010204; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #e2e8f0; user-select: none; -webkit-user-select: none; }
         canvas { display: block; touch-action: none; }
-        
+
+        /* Modern Frosted Glass Panels */
         .glass-panel {
-            position: absolute; background: rgba(10, 15, 30, 0.7);
+            position: absolute; background: rgba(10, 15, 30, 0.75);
             backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
             border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px;
-            padding: 20px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
-            box-sizing: border-box; transition: all 0.4s ease-in-out;
+            padding: 16px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.85);
+            box-sizing: border-box; transition: all 0.35s ease;
         }
 
-        #setup-panel { top: 20px; left: 20px; width: 300px; z-index: 10; }
-        #setup-panel.hidden { opacity: 0; pointer-events: none; transform: translateX(-50px); }
-        
-        #telemetry-hud { bottom: -300px; left: 20px; width: 300px; z-index: 10; padding: 15px; opacity: 0; }
-        #telemetry-hud.active { bottom: 20px; opacity: 1; }
+        #setup-panel { top: 15px; left: 15px; width: 330px; z-index: 10; max-height: 92vh; overflow-y: auto; }
+        #setup-panel.hidden { opacity: 0; pointer-events: none; transform: translateX(-40px); }
 
-        #planet-info { top: 20px; right: -400px; width: 300px; z-index: 10; border-left: 4px solid #38bdf8; }
-        #planet-info.active { right: 20px; }
+        #telemetry-hud { bottom: -350px; left: 15px; width: 320px; z-index: 10; opacity: 0; }
+        #telemetry-hud.active { bottom: 15px; opacity: 1; }
 
-        /* Scientific Data Modal */
+        #cam-follow-indicator {
+            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+            background: rgba(14, 165, 233, 0.2); border: 1px solid #38bdf8;
+            padding: 6px 16px; border-radius: 20px; font-size: 11px; letter-spacing: 1px;
+            text-transform: uppercase; color: #38bdf8; pointer-events: none; transition: opacity 0.3s;
+            backdrop-filter: blur(8px);
+        }
+        #cam-follow-indicator.hidden { opacity: 0; }
+
+        #resume-track-btn {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #0284c7; color: white; border: none; padding: 8px 18px;
+            border-radius: 20px; font-size: 12px; font-weight: bold; cursor: pointer;
+            box-shadow: 0 4px 20px rgba(2, 132, 199, 0.5); z-index: 10; display: none;
+        }
+
+        #planet-info { top: 15px; right: -420px; width: 310px; z-index: 10; border-left: 4px solid #38bdf8; }
+        #planet-info.active { right: 15px; }
+
+        /* Scientific Calculation Modal */
         #math-modal {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
-            width: 90%; max-width: 500px; z-index: 100; opacity: 0; pointer-events: none;
-            transition: all 0.3s;
+            width: 92%; max-width: 580px; max-height: 85vh; overflow-y: auto; z-index: 100;
+            opacity: 0; pointer-events: none; transition: all 0.3s;
         }
         #math-modal.active { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
-        
+
         #modal-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6); z-index: 99; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+            background: rgba(0,0,0,0.7); z-index: 99; opacity: 0; pointer-events: none; transition: opacity 0.3s;
         }
         #modal-overlay.active { opacity: 1; pointer-events: auto; }
 
-        h2 { margin: 0 0 15px 0; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: #38bdf8; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; }
-        h3 { margin: 0 0 5px 0; font-size: 20px; color: #fff; }
-        
-        .data-grid { display: grid; grid-template-columns: 1fr; gap: 6px; }
-        .data-row { display: flex; justify-content: space-between; font-size: 12px; border-bottom: 1px dotted rgba(255,255,255,0.1); padding-bottom: 4px; }
-        .data-label { color: #94a3b8; }
-        .data-value { font-family: "Courier New", Courier, monospace; color: #10b981; font-weight: bold; }
+        h2 { margin: 0 0 10px 0; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #38bdf8; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; }
+        h3 { margin: 0 0 4px 0; font-size: 18px; color: #fff; }
 
-        select { width: 100%; padding: 10px; background: rgba(0,0,0,0.5); color: #fff; border: 1px solid #38bdf8; border-radius: 8px; margin-bottom: 15px; font-size: 14px; outline: none; }
-        
-        .btn { width: 100%; padding: 12px; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: background 0.2s; margin-top: 8px; }
+        .control-group { margin-bottom: 12px; }
+        label { display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+        select, input[type="range"], input[type="date"] {
+            width: 100%; padding: 8px; background: rgba(15, 23, 42, 0.8); color: #fff;
+            border: 1px solid #334155; border-radius: 8px; font-size: 12px; outline: none; box-sizing: border-box;
+        }
+        select:focus, input:focus { border-color: #38bdf8; }
+
+        .checkbox-group { display: flex; align-items: center; gap: 8px; margin: 10px 0; font-size: 12px; color: #f8fafc; }
+        .checkbox-group input { width: 16px; height: 16px; accent-color: #38bdf8; }
+
+        .data-grid { display: grid; grid-template-columns: 1fr; gap: 5px; margin-top: 8px; }
+        .data-row { display: flex; justify-content: space-between; font-size: 11px; border-bottom: 1px dotted rgba(255,255,255,0.1); padding-bottom: 3px; }
+        .data-label { color: #94a3b8; }
+        .data-value { font-family: "SF Mono", Monaco, Consolas, monospace; color: #10b981; font-weight: bold; }
+
+        .btn { width: 100%; padding: 11px; color: #fff; border: none; border-radius: 8px; font-size: 12px; font-weight: bold; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: background 0.2s; margin-top: 6px; }
         .btn-blue { background: #0284c7; } .btn-blue:hover { background: #0369a1; }
         .btn-red { background: #be123c; } .btn-red:hover { background: #9f1239; }
-        .btn-outline { background: transparent; border: 1px solid #38bdf8; color: #38bdf8; } .btn-outline:hover { background: rgba(56, 189, 248, 0.1); }
+        .btn-outline { background: transparent; border: 1px solid #38bdf8; color: #38bdf8; }
 
-        #crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; pointer-events: none; z-index: 5; transition: all 0.2s; }
-        #crosshair::after { content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: rgba(255,255,255,0.5); transform: translate(-50%, -50%); border-radius: 50%; }
-        body.pointing #crosshair { border-color: #38bdf8; transform: translate(-50%, -50%) scale(1.5); }
-        
-        .math-text { font-size: 13px; line-height: 1.6; color: #cbd5e1; margin-bottom: 15px; }
-        .math-eq { font-family: monospace; color: #f472b6; background: rgba(0,0,0,0.4); padding: 4px 8px; border-radius: 4px; display: inline-block; margin: 4px 0; }
+        .porkchop-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-top: 4px; }
+        .porkchop-good { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #059669; }
+        .porkchop-poor { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #dc2626; }
+
+        .calc-step { background: rgba(15, 23, 42, 0.5); border-left: 3px solid #38bdf8; padding: 8px 12px; margin-bottom: 10px; border-radius: 0 8px 8px 0; font-size: 12px; line-height: 1.5; }
+        .calc-eq { font-family: monospace; color: #f472b6; background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px; display: inline-block; margin: 3px 0; }
     </style>
 </head>
 <body>
 
-    <div id="crosshair"></div>
+    <div id="cam-follow-indicator">Tracking: Earth</div>
+    <button id="resume-track-btn">Resume Auto-Tracking</button>
     <div id="modal-overlay"></div>
 
-    <!-- LAUNCH SETUP -->
+    <!-- MISSION CONFIGURATION PANEL -->
     <div id="setup-panel" class="glass-panel">
-        <h2>Mission Control</h2>
-        <select id="target-selector">
-            <option value="mercury">Target: Mercury</option>
-            <option value="venus">Target: Venus</option>
-            <option value="moon">Target: The Moon</option>
-            <option value="mars">Target: Mars</option>
-            <option value="jupiter">Target: Jupiter</option>
-            <option value="saturn">Target: Saturn</option>
-            <option value="uranus">Target: Uranus</option>
-            <option value="neptune">Target: Neptune</option>
-        </select>
-        <button id="launch-btn" class="btn btn-blue">Initiate Launch</button>
+        <h2>Mission Architect</h2>
+
+        <div class="control-group">
+            <label>Launch Epoch (Sep 2026 - Dec 2028)</label>
+            <input type="date" id="date-input" min="2026-09-11" max="2028-12-31" value="2026-09-11">
+            <input type="range" id="date-slider" min="0" max="842" step="15" value="0" style="margin-top:6px;">
+        </div>
+
+        <div class="control-group">
+            <label>Target Destination</label>
+            <select id="target-selector">
+                <option value="moon">The Moon (Luna)</option>
+                <option value="mars" selected>Mars (Red Planet)</option>
+                <option value="mercury">Mercury</option>
+                <option value="venus">Venus</option>
+                <option value="jupiter">Jupiter</option>
+                <option value="saturn">Saturn</option>
+                <option value="uranus">Uranus</option>
+                <option value="neptune">Neptune</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label><span>Dry Spacecraft Mass</span><span id="mass-readout">2,500 kg</span></label>
+            <input type="range" id="mass-slider" min="500" max="10000" step="250" value="2500">
+        </div>
+
+        <div class="control-group">
+            <label>Propulsion System</label>
+            <select id="engine-selector">
+                <option value="chem">Chemical Bipropellant (Isp = 380s)</option>
+                <option value="ion">NEXT Ion Electric (Isp = 3,100s)</option>
+            </select>
+        </div>
+
+        <div class="checkbox-group" id="assist-container">
+            <input type="checkbox" id="assist-toggle">
+            <label for="assist-toggle" style="margin:0; text-transform:none; color:#f8fafc; font-size:12px;">Jupiter Gravity Assist (ΔV Saving)</label>
+        </div>
+
+        <div id="porkchop-status" class="porkchop-badge porkchop-good">Hohmann Window: Analyzing...</div>
+
+        <button id="launch-btn" class="btn btn-blue" style="margin-top:12px;">Execute Trans-Planetary Injection</button>
     </div>
 
     <!-- FLIGHT TELEMETRY HUD -->
     <div id="telemetry-hud" class="glass-panel">
-        <h2 style="font-size: 12px; margin-bottom: 10px;">Flight Telemetry</h2>
+        <h2>Telemetry & Astrodynamics</h2>
         <div class="data-grid">
-            <div class="data-row"><span class="data-label">Phase:</span><span class="data-value" id="t-phase">Pre-Launch</span></div>
-            <div class="data-row"><span class="data-label">Mass (kg):</span><span class="data-value" id="t-mass">4500.00</span></div>
-            <div class="data-row"><span class="data-label">Velocity (km/s):</span><span class="data-value" id="t-vel">0.00</span></div>
-            <div class="data-row"><span class="data-label">Atmos Drag (N):</span><span class="data-value" id="t-drag">0.00</span></div>
+            <div class="data-row"><span class="data-label">Mission Phase:</span><span class="data-value" id="t-phase">Pre-Launch</span></div>
+            <div class="data-row"><span class="data-label">Live Mass:</span><span class="data-value" id="t-mass">--</span></div>
+            <div class="data-row"><span class="data-label">Propellant Expended:</span><span class="data-value" id="t-fuel">--</span></div>
+            <div class="data-row"><span class="data-label">Distance Traversed:</span><span class="data-value" id="t-dist">0.00 M km</span></div>
+            <div class="data-row"><span class="data-label">Velocity relative Sun:</span><span class="data-value" id="t-vel">--</span></div>
+            <div class="data-row"><span class="data-label">Burn Sequence:</span><span class="data-value" id="t-burns">Burn 1: Ready</span></div>
         </div>
-        <button id="math-btn" class="btn btn-outline" style="margin-top:15px;">View Science Logic</button>
-        <button id="reset-btn" class="btn btn-red">Abort & Start New Mission</button>
+        <button id="math-btn" class="btn btn-outline" style="margin-top:10px;">Inspect Physics Calculations</button>
+        <button id="reset-btn" class="btn btn-red">Abort & Configure New Mission</button>
     </div>
 
-    <!-- SCIENTIFIC EXPLANATION MODAL -->
+    <!-- CALCULATIONS MODAL -->
     <div id="math-modal" class="glass-panel">
-        <h2 style="color: #f472b6;">Astrodynamics Engine</h2>
-        <div class="math-text">
-            This simulation uses real-world orbital mechanics to calculate the trajectory in real-time. It is absolutely accurate based on the following laws:
-        </div>
-        <div class="math-text">
-            <strong>1. Patched-Conic Transfer:</strong> The spacecraft doesn't fly straight. It calculates a Bezier interpolation to intercept the target's <em>future</em> position.
-        </div>
-        <div class="math-text">
-            <strong>2. Tsiolkovsky Rocket Equation:</strong> <br><span class="math-eq">Δv = ve * ln(m0 / mf)</span><br> Notice the mass dynamically decreasing as propellant burns during atmospheric ascent and orbital injection.
-        </div>
-        <div class="math-text">
-            <strong>3. Atmospheric Drag Decay:</strong> <br><span class="math-eq">Fd = 1/2 * ρ * v² * Cd * A</span><br> Drag spikes on launch, then exponentially decays to absolute zero as it enters the vacuum of space.
-        </div>
-        <button id="close-modal-btn" class="btn btn-blue">Acknowledge</button>
+        <h2 style="color: #f472b6;">Astrodynamics Mathematical Foundation</h2>
+        <div id="math-content"></div>
+        <button id="close-modal-btn" class="btn btn-blue">Close Inspector</button>
     </div>
 
-    <!-- PLANET SCANNER INFO -->
+    <!-- PLANET DATA POPUP -->
     <div id="planet-info" class="glass-panel">
-        <h2>Astrophysical Data</h2>
+        <h2>Ephemeris Telemetry</h2>
         <h3 id="p-name">Planet Name</h3>
-        <p style="font-size: 12px; color: #94a3b8; margin-top: -5px; margin-bottom: 15px;" id="p-type">Terrestrial Planet</p>
+        <p style="font-size: 11px; color: #94a3b8; margin: -2px 0 10px 0;" id="p-type">Terrestrial Body</p>
         <div class="data-grid">
-            <div class="data-row"><span class="data-label">Gravity (m/s²):</span><span class="data-value" id="p-grav">--</span></div>
-            <div class="data-row"><span class="data-label">Dist. from Sun (AU):</span><span class="data-value" id="p-au">--</span></div>
-            <div class="data-row"><span class="data-label">Live Dist. to Earth:</span><span class="data-value" id="p-dist">--</span></div>
-            <div class="data-row"><span class="data-label">Orbital Period:</span><span class="data-value" id="p-period">--</span></div>
+            <div class="data-row"><span class="data-label">Equatorial Gravity:</span><span class="data-value" id="p-grav">--</span></div>
+            <div class="data-row"><span class="data-label">Heliocentric Radius:</span><span class="data-value" id="p-au">--</span></div>
+            <div class="data-row"><span class="data-label">Distance to Earth:</span><span class="data-value" id="p-dist">--</span></div>
+            <div class="data-row"><span class="data-label">Sidereal Orbit Period:</span><span class="data-value" id="p-period">--</span></div>
+            <div class="data-row"><span class="data-label">Eccentric Anomaly (E):</span><span class="data-value" id="p-anom">--</span></div>
         </div>
-        <button id="close-info" class="btn" style="margin-top: 15px; background: #334155;">Close Scanner</button>
+        <button id="close-info" class="btn" style="margin-top: 12px; background: #334155;">Close Data</button>
     </div>
 
     <script type="importmap">
@@ -141,27 +191,109 @@
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        const textureLoader = new THREE.TextureLoader();
-        textureLoader.setCrossOrigin('anonymous');
+        // =========================================================================
+        // 1. PHYSICAL CONSTANTS & NASA JPL KEPLERIAN ELEMENTS (Epoch J2000)
+        // =========================================================================
+        const AU_KM = 149597870.7;
+        const G0 = 9.80665; // m/s^2
+        const MU_SUN = 1.32712440018e11; // km^3/s^2
 
-        // ADDED: initAngle randomizes positions so they don't start in a line
-        const bodies = {
-            sun: { name: "The Sun", type: "G-Type Main-Sequence Star", color: 0xffddaa, radius: 25, visual_a: 0, au: 0, speed: 0, grav: 274, period: "N/A (Central Body)", initAngle: 0 },
-            mercury: { name: "Mercury", type: "Terrestrial Planet", color: 0x888888, radius: 1.5, visual_a: 40, au: 0.39, speed: 0.04, grav: 3.7, period: "88 Days", initAngle: Math.random()*Math.PI*2 },
-            venus: { name: "Venus", type: "Terrestrial Planet", color: 0xe3bb76, radius: 2.8, visual_a: 60, au: 0.72, speed: 0.03, grav: 8.87, period: "225 Days", initAngle: Math.random()*Math.PI*2 },
-            earth: { name: "Earth", type: "Terrestrial Planet", texture: 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg', radius: 3.5, visual_a: 90, au: 1.0, speed: 0.025, grav: 9.8, period: "365.2 Days", initAngle: Math.random()*Math.PI*2 },
-            moon: { name: "The Moon", type: "Natural Satellite", texture: 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/moon_1024.jpg', radius: 1, visual_a: 8, au: 1.002, speed: 0.08, grav: 1.62, period: "27.3 Days", parent: "earth", initAngle: Math.random()*Math.PI*2 },
-            mars: { name: "Mars", type: "Terrestrial Planet", color: 0xc1440e, radius: 1.8, visual_a: 130, au: 1.52, speed: 0.02, grav: 3.72, period: "687 Days", initAngle: Math.random()*Math.PI*2 },
-            jupiter: { name: "Jupiter", type: "Gas Giant", color: 0xd39c7e, radius: 12, visual_a: 240, au: 5.20, speed: 0.01, grav: 24.79, period: "11.8 Years", initAngle: Math.random()*Math.PI*2 },
-            saturn: { name: "Saturn", type: "Gas Giant", color: 0xead6b8, radius: 10, visual_a: 350, au: 9.58, speed: 0.008, grav: 10.44, period: "29.5 Years", hasRings: true, initAngle: Math.random()*Math.PI*2 },
-            uranus: { name: "Uranus", type: "Ice Giant", color: 0x93b8c4, radius: 7, visual_a: 450, au: 19.22, speed: 0.005, grav: 8.69, period: "84 Years", hasRings: true, verticalRings: true, initAngle: Math.random()*Math.PI*2 },
-            neptune: { name: "Neptune", type: "Ice Giant", color: 0x3b5d82, radius: 6.8, visual_a: 550, au: 30.05, speed: 0.004, grav: 11.15, period: "165 Years", initAngle: Math.random()*Math.PI*2 }
+        // NASA JPL Planetary Elements: a (AU), e, I (deg), L (deg), longPeri (deg), longNode (deg), rate (deg/day)
+        const JPL_DATA = {
+            mercury: { name: "Mercury", type: "Terrestrial Planet", a: 0.387098, e: 0.205630, I: 7.005, L: 252.25, wBar: 77.456, node: 48.331, rate: 4.092334, radius: 1.6, color: 0xa8a29e, grav: 3.7, period: "87.97 Days" },
+            venus:   { name: "Venus", type: "Terrestrial Planet", a: 0.723332, e: 0.006773, I: 3.394, L: 181.98, wBar: 131.53, node: 76.680, rate: 1.602130, radius: 3.0, color: 0xfde047, grav: 8.87, period: "224.70 Days" },
+            earth:   { name: "Earth", type: "Terrestrial Planet", a: 1.000000, e: 0.016708, I: 0.000, L: 100.46, wBar: 102.94, node: 0.0000, rate: 0.985609, radius: 3.2, texture: 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg', grav: 9.81, period: "365.25 Days" },
+            moon:    { name: "The Moon", type: "Natural Satellite", a: 0.00257, e: 0.0549, I: 5.14, L: 0, wBar: 0, node: 0, rate: 13.176358, radius: 0.9, texture: 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/moon_1024.jpg', grav: 1.62, period: "27.32 Days", parent: "earth" },
+            mars:    { name: "Mars", type: "Terrestrial Planet", a: 1.523679, e: 0.093405, I: 1.850, L: 355.45, wBar: 336.04, node: 49.557, rate: 0.524033, radius: 2.1, color: 0xef4444, grav: 3.72, period: "686.98 Days" },
+            jupiter: { name: "Jupiter", type: "Gas Giant", a: 5.204267, e: 0.048498, I: 1.303, L: 34.404, wBar: 14.753, node: 100.55, rate: 0.083085, radius: 9.5, color: 0xfbcfe8, grav: 24.79, period: "11.86 Years" },
+            saturn:  { name: "Saturn", type: "Gas Giant", a: 9.5826, e: 0.05555, I: 2.485, L: 49.944, wBar: 92.431, node: 113.71, rate: 0.033444, radius: 8.0, color: 0xfef08a, grav: 10.44, period: "29.46 Years", hasRings: true },
+            uranus:  { name: "Uranus", type: "Ice Giant", a: 19.2294, e: 0.047318, I: 0.772, L: 313.23, wBar: 170.96, node: 74.229, rate: 0.011728, radius: 5.5, color: 0x67e8f9, grav: 8.69, period: "84.01 Years", hasRings: true, verticalRings: true },
+            neptune: { name: "Neptune", type: "Ice Giant", a: 30.0699, e: 0.008606, I: 1.770, L: 304.88, wBar: 44.971, node: 131.72, rate: 0.005981, radius: 5.3, color: 0x3b82f6, grav: 11.15, period: "164.80 Years" }
         };
 
+        // Visual logarithmic scaling for rendering without precision loss
+        function auToVisual(au) {
+            return 35 + 85 * Math.log10(1 + au * 3.5);
+        }
+
+        // =========================================================================
+        // 2. KEPLER SOLVER & EPHEMERIS PROPAGATION
+        // =========================================================================
+        const BASE_DATE = new Date("2026-09-11T00:00:00Z");
+        const J2000 = new Date("2000-01-01T12:00:00Z");
+
+        function getDaysSinceJ2000(date) {
+            return (date - J2000) / (1000 * 60 * 60 * 24);
+        }
+
+        function solveKepler(M, e) {
+            let E = M;
+            for (let i = 0; i < 15; i++) {
+                let delta = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+                E -= delta;
+                if (Math.abs(delta) < 1e-7) break;
+            }
+            return E;
+        }
+
+        function computePlanetPosition(bodyKey, daysSinceJ2000) {
+            const b = JPL_DATA[bodyKey];
+            if (b.parent === "earth") {
+                // Moon relative to Earth: true period ~27.32166 days (13.368 orbits per Earth year)
+                const moonMeanMotion = (2 * Math.PI) / 27.32166;
+                const theta = moonMeanMotion * daysSinceJ2000;
+                const rVis = 8.5; // Visual separation
+                return {
+                    x: rVis * Math.cos(theta),
+                    y: rVis * Math.sin(theta) * 0.09, // 5.14 deg inclination
+                    z: rVis * Math.sin(theta),
+                    rAU: 0.00257,
+                    E: 0,
+                    nu: theta
+                };
+            }
+
+            const M_deg = (b.L + b.rate * daysSinceJ2000 - b.wBar) % 360;
+            const M = THREE.MathUtils.degToRad(M_deg < 0 ? M_deg + 360 : M_deg);
+            const E = solveKepler(M, b.e);
+
+            const nu = 2 * Math.atan2(Math.sqrt(1 + b.e) * Math.sin(E / 2), Math.sqrt(1 - b.e) * Math.cos(E / 2));
+            const rAU = b.a * (1 - b.e * Math.cos(E));
+
+            const w = THREE.MathUtils.degToRad(b.wBar - b.node);
+            const I = THREE.MathUtils.degToRad(b.I);
+            const node = THREE.MathUtils.degToRad(b.node);
+
+            // Orbital plane coordinates
+            const xp = rAU * Math.cos(nu);
+            const yp = rAU * Math.sin(nu);
+
+            // Heliocentric J2000 Ecliptic XYZ
+            const xAU = xp * (Math.cos(w) * Math.cos(node) - Math.sin(w) * Math.sin(node) * Math.cos(I)) - yp * (Math.sin(w) * Math.cos(node) + Math.cos(w) * Math.sin(node) * Math.cos(I));
+            const zAU = xp * (Math.cos(w) * Math.sin(node) + Math.sin(w) * Math.cos(node) * Math.cos(I)) - yp * (Math.sin(w) * Math.sin(node) - Math.cos(w) * Math.cos(node) * Math.cos(I));
+            const yAU = xp * (Math.sin(w) * Math.sin(I)) + yp * (Math.cos(w) * Math.sin(I));
+
+            const vRadius = auToVisual(rAU);
+            const scale = vRadius / rAU;
+
+            return {
+                x: xAU * scale,
+                y: yAU * scale * 2.0, // slight vertical exaggeration for 3D visibility
+                z: zAU * scale,
+                rAU,
+                E: THREE.MathUtils.radToDeg(E).toFixed(2),
+                nu
+            };
+        }
+
+        // =========================================================================
+        // 3. THREE.JS SCENE SETUP
+        // =========================================================================
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x010204);
-        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 10000);
-        camera.position.set(0, 300, 700); 
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 25000);
+        camera.position.set(0, 320, 680);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -169,55 +301,248 @@
         document.body.appendChild(renderer.domElement);
 
         const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true; controls.dampingFactor = 0.05;
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
 
-        scene.add(new THREE.PointLight(0xffffff, 50000, 5000));
-        scene.add(new THREE.AmbientLight(0x222233));
+        // Auto-tracking camera logic
+        let trackingTarget = "earth";
+        let autoTracking = true;
 
-        const starsGeo = new THREE.BufferGeometry();
-        const starsPos = new Float32Array(5000 * 3);
-        for(let i=0; i<15000; i++) starsPos[i] = (Math.random() - 0.5) * 5000;
-        starsGeo.setAttribute('position', new THREE.BufferAttribute(starsPos, 3));
-        scene.add(new THREE.Points(starsGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.5, transparent: true, opacity: 0.6 })));
+        function setTracking(targetName) {
+            trackingTarget = targetName;
+            autoTracking = true;
+            document.getElementById('cam-follow-indicator').innerText = `Tracking: ${targetName.toUpperCase()}`;
+            document.getElementById('cam-follow-indicator').classList.remove('hidden');
+            document.getElementById('resume-track-btn').style.display = 'none';
+        }
 
-        const planetMeshes = {};
-        let timeOffset = 0; 
-
-        Object.keys(bodies).forEach(key => {
-            const data = bodies[key];
-            let mat = data.texture ? 
-                new THREE.MeshStandardMaterial({ map: textureLoader.load(data.texture), roughness: 0.7 }) : 
-                new THREE.MeshStandardMaterial({ color: data.color, roughness: 0.8 });
-            
-            if(key === 'sun') mat = new THREE.MeshBasicMaterial({ color: data.color });
-
-            const mesh = new THREE.Mesh(new THREE.SphereGeometry(data.radius, 32, 32), mat);
-            mesh.userData = { id: key, ...data }; 
-            scene.add(mesh);
-            planetMeshes[key] = mesh;
-
-            if (data.visual_a > 0 && !data.parent) {
-                const ring = new THREE.Mesh(new THREE.RingGeometry(data.visual_a - 0.5, data.visual_a + 0.5, 128), new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.08 }));
-                ring.rotation.x = Math.PI / 2;
-                scene.add(ring);
-            }
-
-            if(data.hasRings) {
-                const ringColor = key === 'uranus' ? 0x93b8c4 : 0xc4b7a1;
-                const rings = new THREE.Mesh(new THREE.RingGeometry(data.radius * 1.4, data.radius * 2.2, 64), new THREE.MeshStandardMaterial({ color: ringColor, side: THREE.DoubleSide, transparent: true, opacity: 0.6 }));
-                rings.rotation.x = data.verticalRings ? 0 : Math.PI / 2 + 0.2;
-                if(data.verticalRings) rings.rotation.y = Math.PI / 2;
-                mesh.add(rings);
+        // User touch breaks auto-tracking to allow manual control
+        window.addEventListener('pointerdown', (e) => {
+            if (e.target.tagName !== 'CANVAS') return;
+            if (autoTracking) {
+                autoTracking = false;
+                document.getElementById('cam-follow-indicator').classList.add('hidden');
+                document.getElementById('resume-track-btn').style.display = 'block';
             }
         });
 
-        // UI INTERACTIVITY
+        document.getElementById('resume-track-btn').addEventListener('click', () => {
+            setTracking(missionState.active ? "spacecraft" : document.getElementById('target-selector').value);
+        });
+
+        // Lighting & Skybox
+        scene.add(new THREE.PointLight(0xffffff, 80000, 8000));
+        scene.add(new THREE.AmbientLight(0x222238));
+
+        // Sun
+        const sun = new THREE.Mesh(new THREE.SphereGeometry(20, 32, 32), new THREE.MeshBasicMaterial({ color: 0xfffbeb }));
+        const corona = new THREE.Mesh(new THREE.SphereGeometry(24, 32, 32), new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending }));
+        scene.add(sun); scene.add(corona);
+
+        // Procedural Galaxy Field
+        const starGeo = new THREE.BufferGeometry();
+        const starPos = new Float32Array(5000 * 3);
+        for(let i=0; i<15000; i++) starPos[i] = (Math.random() - 0.5) * 8000;
+        starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+        scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.2, transparent: true, opacity: 0.6 })));
+
+        // Create Planet Meshes
+        const planetMeshes = {};
+        const orbitLines = {};
+        const textureLoader = new THREE.TextureLoader();
+        textureLoader.setCrossOrigin('anonymous');
+
+        Object.keys(JPL_DATA).forEach(key => {
+            const data = JPL_DATA[key];
+            let mat = data.texture ?
+                new THREE.MeshStandardMaterial({ map: textureLoader.load(data.texture), roughness: 0.7 }) :
+                new THREE.MeshStandardMaterial({ color: data.color, roughness: 0.8 });
+
+            const mesh = new THREE.Mesh(new THREE.SphereGeometry(data.radius, 32, 32), mat);
+            mesh.userData = { id: key, ...data };
+            scene.add(mesh);
+            planetMeshes[key] = mesh;
+
+            // Rings
+            if (data.hasRings) {
+                const ringCol = key === 'uranus' ? 0x67e8f9 : 0xd4cbb4;
+                const ringMesh = new THREE.Mesh(new THREE.RingGeometry(data.radius * 1.4, data.radius * 2.3, 64), new THREE.MeshStandardMaterial({ color: ringCol, side: THREE.DoubleSide, transparent: true, opacity: 0.7 }));
+                ringMesh.rotation.x = data.verticalRings ? 0 : Math.PI / 2 + 0.3;
+                if (data.verticalRings) ringMesh.rotation.y = Math.PI / 2;
+                mesh.add(ringMesh);
+            }
+
+            // Orbital Path line (heliocentric)
+            if (data.a > 0.01) {
+                const pts = [];
+                for(let d = 0; d <= 360; d += 4) {
+                    const pos = computePlanetPosition(key, d * (365.25 / 360) * (data.period.includes("Years") ? parseFloat(data.period) : 1));
+                    pts.push(new THREE.Vector3(pos.x, pos.y, pos.z));
+                }
+                const lGeo = new THREE.BufferGeometry().setFromPoints(pts);
+                const lMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.07 });
+                const line = new THREE.LineLoop(lGeo, lMat);
+                scene.add(line);
+                orbitLines[key] = line;
+            }
+        });
+
+        // =========================================================================
+        // 4. ASTRODYNAMICS & TSIOLKOVSKY PROPULSION ENGINE
+        // =========================================================================
+        let currentDate = new Date(BASE_DATE);
+        let satMesh = null;
+        let flightTrail = null;
+
+        const missionState = {
+            active: false,
+            targetId: "mars",
+            engine: "chem",
+            dryMass: 2500,
+            propellantMass: 0,
+            totalDeltaV: 0,
+            launchPos: new THREE.Vector3(),
+            targetArrivalPos: new THREE.Vector3(),
+            flightPoints: [],
+            progress: 0,
+            totalDistanceKm: 0,
+            orbitAngle: 0,
+            insertionComplete: false,
+            useGravityAssist: false,
+            assistProgress: 0
+        };
+
+        function calculateHohmannBudget(targetKey, dryMass, engineType, useAssist) {
+            const r1 = 1.0; // Earth AU
+            const r2 = JPL_DATA[targetKey].a;
+            const r1_km = r1 * AU_KM;
+            const r2_km = r2 * AU_KM;
+
+            // Semi-major axis of transfer ellipse
+            const a_tx_km = (r1_km + r2_km) / 2;
+
+            // Velocities
+            const v1_peri = Math.sqrt(MU_SUN * (2 / r1_km - 1 / a_tx_km));
+            const v_earth = Math.sqrt(MU_SUN / r1_km);
+            const dv1 = Math.abs(v1_peri - v_earth); // km/s
+
+            const v2_apo = Math.sqrt(MU_SUN * (2 / r2_km - 1 / a_tx_km));
+            const v_target = Math.sqrt(MU_SUN / r2_km);
+            let dv2 = Math.abs(v_target - v2_apo); // km/s
+
+            let assistSavings = 0;
+            if (useAssist && ["saturn", "uranus", "neptune"].includes(targetKey)) {
+                // Jupiter flyby provides up to 35-45% delta-V reduction for outer transfers
+                assistSavings = dv2 * 0.42;
+                dv2 -= assistSavings;
+            }
+
+            const totalDV = (dv1 + dv2) * 1000; // convert to m/s
+            const isp = engineType === "chem" ? 380 : 3100; // seconds
+            const ve = isp * G0; // effective exhaust velocity
+
+            // Tsiolkovsky mass ratio: mf = m0 * exp(-dv/ve)
+            // m0 = mf * exp(dv/ve) -> m_propellant = m0 - mf
+            const initialMass = dryMass * Math.exp(totalDV / ve);
+            const propellantMass = initialMass - dryMass;
+
+            // Actual transfer arc distance (Ramanujan ellipse perimeter approximation / 2)
+            const a_AU = (r1 + r2) / 2;
+            const b_AU = Math.sqrt(r1 * r2);
+            const h_val = Math.pow(r1 - r2, 2) / Math.pow(r1 + r2, 2);
+            const perimeterAU = Math.PI * (a_AU + b_AU) * (1 + (3 * h_val) / (10 + Math.sqrt(4 - 3 * h_val)));
+            const distanceKm = (perimeterAU / 2) * AU_KM;
+
+            return {
+                dv1_kms: dv1.toFixed(2),
+                dv2_kms: dv2.toFixed(2),
+                assistSavings: assistSavings.toFixed(2),
+                totalDV_ms: totalDV.toFixed(0),
+                propellantKg: propellantMass.toFixed(1),
+                totalMassKg: initialMass.toFixed(1),
+                distanceKm,
+                distanceAU: (distanceKm / AU_KM).toFixed(2),
+                isp
+            };
+        }
+
+        function updatePorkchopEvaluation() {
+            const targetKey = document.getElementById('target-selector').value;
+            const days = getDaysSinceJ2000(currentDate);
+
+            const earthPos = computePlanetPosition("earth", days);
+            const targetPos = computePlanetPosition(targetKey, days);
+
+            // Phase angle between Earth and Target
+            const earthAngle = Math.atan2(earthPos.z, earthPos.x);
+            const targetAngle = Math.atan2(targetPos.z, targetPos.x);
+            let currentPhase = THREE.MathUtils.radToDeg(targetAngle - earthAngle);
+            if (currentPhase < 0) currentPhase += 360;
+
+            // Theoretical optimal Hohmann alignment angle: phi = 180 * (1 - (1/(2*sqrt(2))) * (1 + r1/r2)^(3/2))
+            const r1 = 1.0;
+            const r2 = JPL_DATA[targetKey].a;
+            let optPhase = 180 * (1 - (1 / (2 * Math.sqrt(2))) * Math.pow(1 + r1 / r2, 1.5));
+            optPhase = (optPhase % 360 + 360) % 360;
+
+            const diff = Math.abs(currentPhase - optPhase);
+            const badge = document.getElementById('porkchop-status');
+
+            if (diff < 28 || diff > 332) {
+                badge.className = "porkchop-badge porkchop-good";
+                badge.innerText = `Optimal Hohmann Window (Phase Alignment ~${(100 - diff).toFixed(0)}%)`;
+            } else {
+                badge.className = "porkchop-badge porkchop-poor";
+                badge.innerText = `Off-Cycle Window (ΔV Fuel Penalty: +${(diff * 0.45).toFixed(0)}%)`;
+            }
+        }
+
+        // =========================================================================
+        // 5. USER INTERFACE & DATE SYNCHRONIZATION
+        // =========================================================================
+        const dateInput = document.getElementById('date-input');
+        const dateSlider = document.getElementById('date-slider');
+        const targetSelector = document.getElementById('target-selector');
+        const massSlider = document.getElementById('mass-slider');
+        const massReadout = document.getElementById('mass-readout');
+        const engineSelector = document.getElementById('engine-selector');
+        const assistToggle = document.getElementById('assist-toggle');
+        const assistContainer = document.getElementById('assist-container');
+
+        function syncDate(newDate) {
+            currentDate = new Date(newDate);
+            dateInput.value = currentDate.toISOString().split('T')[0];
+            const offsetDays = (currentDate - BASE_DATE) / (1000 * 60 * 60 * 24);
+            dateSlider.value = Math.max(0, Math.min(842, offsetDays));
+
+            updatePlanetaryPositions();
+            updatePorkchopEvaluation();
+        }
+
+        dateInput.addEventListener('change', (e) => syncDate(e.target.value));
+        dateSlider.addEventListener('input', (e) => {
+            const d = new Date(BASE_DATE);
+            d.setDate(d.getDate() + parseInt(e.target.value));
+            syncDate(d);
+        });
+
+        massSlider.addEventListener('input', (e) => {
+            massReadout.innerText = `${parseInt(e.target.value).toLocaleString()} kg`;
+        });
+
+        targetSelector.addEventListener('change', (e) => {
+            const t = e.target.value;
+            assistContainer.style.display = ["saturn", "uranus", "neptune"].includes(t) ? "flex" : "none";
+            setTracking(t);
+            updatePorkchopEvaluation();
+        });
+
+        // Tapping/Clicking Planets for Ephemeris Pop-up
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
-        
+
         window.addEventListener('pointerdown', (e) => {
-            if(e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') return; // Ignore UI clicks
-            
+            if (e.target.tagName !== 'CANVAS') return;
             const cx = e.touches ? e.touches[0].clientX : e.clientX;
             const cy = e.touches ? e.touches[0].clientY : e.clientY;
             mouse.x = (cx / window.innerWidth) * 2 - 1;
@@ -225,173 +550,302 @@
 
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects(Object.values(planetMeshes));
-            
-            if (intersects.length > 0 && intersects[0].object.userData.name) {
+            if (intersects.length > 0) {
                 const d = intersects[0].object.userData;
-                const mesh = intersects[0].object;
-                
-                document.getElementById('p-name').innerText = d.name;
-                document.getElementById('p-type').innerText = d.type;
-                document.getElementById('p-grav').innerText = d.grav;
-                document.getElementById('p-au').innerText = d.au === 0 ? "0.00 (Center)" : d.au;
-                document.getElementById('p-period').innerText = d.period;
-                
-                // FIXED: Calculate TRUE dynamic 3D Euclidean distance (Visual scale: 1 AU = 90 units)
-                let actualDist = (mesh.position.distanceTo(planetMeshes.earth.position) / 90).toFixed(2);
-                document.getElementById('p-dist').innerText = d.name === "Earth" ? "0.00 AU" : `${actualDist} AU`;
-                
-                document.getElementById('planet-info').classList.add('active');
+                showPlanetCard(d, intersects[0].object);
             }
         });
-        
-        document.getElementById('close-info').addEventListener('click', () => document.getElementById('planet-info').classList.remove('active'));
-        
-        // MODAL LOGIC
+
+        function showPlanetCard(data, mesh) {
+            document.getElementById('p-name').innerText = data.name;
+            document.getElementById('p-type').innerText = data.type;
+            document.getElementById('p-grav').innerText = `${data.grav} m/s²`;
+            document.getElementById('p-au').innerText = data.a > 0.01 ? `${data.a.toFixed(3)} AU` : "0.002 AU (Lunar)";
+            document.getElementById('p-period').innerText = data.period;
+
+            // Live 3D distance to Earth
+            const distAU = (mesh.position.distanceTo(planetMeshes.earth.position) / auToVisual(1.0)).toFixed(3);
+            document.getElementById('p-dist').innerText = data.name === "Earth" ? "0.00 AU" : `${distAU} AU (${(distAU * AU_KM / 1e6).toFixed(1)}M km)`;
+
+            const days = getDaysSinceJ2000(currentDate);
+            const pos = computePlanetPosition(data.id, days);
+            document.getElementById('p-anom').innerText = `${pos.E}°`;
+
+            document.getElementById('planet-info').classList.add('active');
+            setTracking(data.id);
+        }
+
+        document.getElementById('close-info').addEventListener('click', () => {
+            document.getElementById('planet-info').classList.remove('active');
+        });
+
+        // =========================================================================
+        // 6. SCIENTIFIC CALCULATION MODAL
+        // =========================================================================
         document.getElementById('math-btn').addEventListener('click', () => {
+            const target = targetSelector.value;
+            const mass = parseFloat(massSlider.value);
+            const engine = engineSelector.value;
+            const assist = assistToggle.checked;
+            const budget = calculateHohmannBudget(target, mass, engine, assist);
+
+            const content = `
+                <div class="calc-step">
+                    <strong>1. Planetary Ephemeris (NASA JPL J2000 Solution):</strong><br>
+                    Mean Anomaly solved iteratively using Newton-Raphson:<br>
+                    <span class="calc-eq">M = L + n·Δt - ϖ</span> | <span class="calc-eq">E - e·sin(E) = M</span><br>
+                    True Anomaly: <span class="calc-eq">ν = 2·arctan(√((1+e)/(1-e))·tan(E/2))</span>
+                </div>
+                <div class="calc-step">
+                    <strong>2. Vis-Viva Energy & Delta-V Maneuvers:</strong><br>
+                    <span class="calc-eq">v² = μ_sun · (2/r - 1/a)</span><br>
+                    • Trans-Planetary Injection (Burn 1): <strong>${budget.dv1_kms} km/s</strong><br>
+                    • Orbital Insertion Retro-Burn (Burn 2): <strong>${budget.dv2_kms} km/s</strong><br>
+                    ${assist ? `• <em>Jupiter Gravity Assist Deflection Bonus: -${budget.assistSavings} km/s</em><br>` : ''}
+                    • Total Mission ΔV: <strong>${budget.totalDV_ms} m/s</strong>
+                </div>
+                <div class="calc-step">
+                    <strong>3. Tsiolkovsky Rocket Equation (Fuel Budget):</strong><br>
+                    <span class="calc-eq">Δv = Isp · g0 · ln(m0 / mf)</span><br>
+                    • Effective Exhaust Velocity (ve): <strong>${(budget.isp * G0).toFixed(1)} m/s</strong><br>
+                    • Dry Payload Mass (mf): <strong>${mass.toLocaleString()} kg</strong><br>
+                    • Required Propellant Mass: <strong>${parseFloat(budget.propellantKg).toLocaleString()} kg</strong><br>
+                    • Total Wet Mass at Launch: <strong>${parseFloat(budget.totalMassKg).toLocaleString()} kg</strong>
+                </div>
+                <div class="calc-step">
+                    <strong>4. Traversal Arc Length & Insertion Dynamics:</strong><br>
+                    Transfer Heliocentric Distance: <strong>${budget.distanceKm.toExponential(3)} km (${budget.distanceAU} AU)</strong><br>
+                    Tangential Insertion Vector: <em>Smooth orbital state-vector handoff entering target's Sphere of Influence (SOI) with zero vertical altitude jump.</em>
+                </div>
+            `;
+            document.getElementById('math-content').innerHTML = content;
             document.getElementById('math-modal').classList.add('active');
             document.getElementById('modal-overlay').classList.add('active');
         });
+
         document.getElementById('close-modal-btn').addEventListener('click', () => {
             document.getElementById('math-modal').classList.remove('active');
             document.getElementById('modal-overlay').classList.remove('active');
         });
 
-        // ASTRODYNAMICS SYSTEM
-        let missionActive = false;
-        let satMesh, trailLine;
-        let physicsState = { progress: 0, mass: 4500, velocity: 0, phase: "Pre-Launch", targetId: null, launchPos: null, orbitAngle: 0, trailPoints: [], orbitInitialized: false };
-
+        // =========================================================================
+        // 7. LAUNCH SEQUENCE & SMOOTH INSERTION
+        // =========================================================================
         document.getElementById('launch-btn').addEventListener('click', () => {
-            if(missionActive) return;
-            missionActive = true;
-            physicsState.targetId = document.getElementById('target-selector').value;
-            physicsState.launchPos = planetMeshes.earth.position.clone();
-            physicsState.orbitInitialized = false;
+            const targetKey = targetSelector.value;
+            const dryMass = parseFloat(massSlider.value);
+            const engine = engineSelector.value;
+            const useAssist = assistToggle.checked;
+
+            const budget = calculateHohmannBudget(targetKey, dryMass, engine, useAssist);
+
+            missionState.active = true;
+            missionState.targetId = targetKey;
+            missionState.engine = engine;
+            missionState.dryMass = dryMass;
+            missionState.propellantMass = parseFloat(budget.propellantKg);
+            missionState.totalDeltaV = parseFloat(budget.totalDV_ms);
+            missionState.totalDistanceKm = budget.distanceKm;
+            missionState.progress = 0;
+            missionState.flightPoints = [];
+            missionState.insertionComplete = false;
+            missionState.useGravityAssist = useAssist && ["saturn", "uranus", "neptune"].includes(targetKey);
+            missionState.launchPos = planetMeshes.earth.position.clone();
 
             document.getElementById('setup-panel').classList.add('hidden');
             document.getElementById('telemetry-hud').classList.add('active');
 
-            // FIXED: Micro-Satellite (Scaled way down!)
+            // Spawn Spacecraft
+            if (satMesh) scene.remove(satMesh);
             satMesh = new THREE.Mesh(
-                new THREE.ConeGeometry(0.15, 0.6, 8),
-                new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.8 })
+                new THREE.ConeGeometry(0.35, 1.2, 8),
+                new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.9 })
             );
-            satMesh.position.copy(physicsState.launchPos);
+            satMesh.position.copy(missionState.launchPos);
             scene.add(satMesh);
 
-            const trailMat = new THREE.LineBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.8, depthWrite: false });
-            trailLine = new THREE.Line(new THREE.BufferGeometry(), trailMat);
-            trailLine.frustumCulled = false; 
-            scene.add(trailLine);
+            // Flight Trail
+            if (flightTrail) scene.remove(flightTrail);
+            const trailMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.85, depthWrite: false });
+            flightTrail = new THREE.Line(new THREE.BufferGeometry(), trailMat);
+            flightTrail.frustumCulled = false;
+            scene.add(flightTrail);
+
+            setTracking("spacecraft");
         });
 
-        // FIXED: Restart Mission Logic
         document.getElementById('reset-btn').addEventListener('click', () => {
-            scene.remove(satMesh);
-            scene.remove(trailLine);
-            missionActive = false;
-            physicsState.progress = 0;
-            physicsState.trailPoints = [];
+            if (satMesh) scene.remove(satMesh);
+            if (flightTrail) scene.remove(flightTrail);
+            missionState.active = false;
+            satMesh = null; flightTrail = null;
             document.getElementById('telemetry-hud').classList.remove('active');
             document.getElementById('setup-panel').classList.remove('hidden');
-            document.getElementById('t-phase').innerText = "Pre-Launch";
+            setTracking(targetSelector.value);
         });
 
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-            timeOffset += 0.05;
+        // =========================================================================
+        // 8. MASTER SIMULATION LOOP
+        // =========================================================================
+        function updatePlanetaryPositions() {
+            const days = getDaysSinceJ2000(currentDate);
 
-            // Update Planets (Using initAngle for random scatter)
-            Object.keys(planetMeshes).forEach(key => {
+            Object.keys(JPL_DATA).forEach(key => {
                 const mesh = planetMeshes[key];
-                const data = bodies[key];
-                if (data.parent === 'earth') {
-                    mesh.position.x = planetMeshes.earth.position.x + data.visual_a * Math.cos(timeOffset * data.speed * 10 + data.initAngle);
-                    mesh.position.z = planetMeshes.earth.position.z + data.visual_a * Math.sin(timeOffset * data.speed * 10 + data.initAngle);
-                } else if (data.visual_a > 0) {
-                    mesh.position.x = data.visual_a * Math.cos(timeOffset * data.speed + data.initAngle);
-                    mesh.position.z = data.visual_a * Math.sin(timeOffset * data.speed + data.initAngle);
+                const pos = computePlanetPosition(key, days);
+
+                if (JPL_DATA[key].parent === "earth") {
+                    const earth = planetMeshes.earth;
+                    mesh.position.set(earth.position.x + pos.x, earth.position.y + pos.y, earth.position.z + pos.z);
+                } else {
+                    mesh.position.set(pos.x, pos.y, pos.z);
                 }
                 mesh.rotation.y += 0.01;
             });
+        }
 
-            if (missionActive) {
-                const targetMesh = planetMeshes[physicsState.targetId];
-                let orbitRad = bodies[physicsState.targetId].radius + 1.5;
+        const clock = new THREE.Clock();
 
-                if (physicsState.progress < 1) {
-                    physicsState.progress += 0.002;
-                    let t = physicsState.progress;
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
 
-                    let p0 = physicsState.launchPos;
-                    
-                    // FIXED: Offset trajectory to STOP at the edge of the atmosphere, not the core!
-                    let dirToEarth = new THREE.Vector3().subVectors(p0, targetMesh.position).normalize();
-                    let p2 = new THREE.Vector3().addVectors(targetMesh.position, dirToEarth.multiplyScalar(orbitRad));
-                    
-                    let p1 = new THREE.Vector3().addVectors(p0, p2).multiplyScalar(0.5);
-                    p1.y += (physicsState.targetId === 'moon') ? 10 : p0.distanceTo(p2) * 0.25; 
+            // Advance time slowly if mission active
+            if (missionState.active) {
+                currentDate.setHours(currentDate.getHours() + 6);
+                updatePlanetaryPositions();
+            } else {
+                updatePlanetaryPositions();
+            }
 
-                    let currentPos = new THREE.Vector3(
-                        (1-t)*(1-t)*p0.x + 2*(1-t)*t*p1.x + t*t*p2.x,
-                        (1-t)*(1-t)*p0.y + 2*(1-t)*t*p1.y + t*t*p2.y,
-                        (1-t)*(1-t)*p0.z + 2*(1-t)*t*p1.z + t*t*p2.z
+            // Spacecraft Flight Dynamics
+            if (missionState.active && satMesh) {
+                const targetMesh = planetMeshes[missionState.targetId];
+                const targetRadius = JPL_DATA[missionState.targetId].radius;
+                const safeOrbitAltitude = targetRadius + 2.0;
+
+                // PHASE 1: INTERCEPT CRUISE
+                if (missionState.progress < 1.0) {
+                    missionState.progress += 0.0018;
+                    const t = missionState.progress;
+
+                    // Compute true tangential arrival vector (targeting orbital perimeter, not center core)
+                    const p0 = missionState.launchPos;
+                    const p2_center = targetMesh.position;
+                    const arrivalTangent = new THREE.Vector3(-p2_center.z, 0, p2_center.x).normalize().multiplyScalar(safeOrbitAltitude);
+                    const p2 = new THREE.Vector3().addVectors(p2_center, arrivalTangent);
+
+                    // Mid-course arc point (scaled height prevents diving through Sun)
+                    let p1;
+                    if (missionState.useGravityAssist) {
+                        // Swing towards Jupiter first
+                        const jupPos = planetMeshes.jupiter.position;
+                        p1 = new THREE.Vector3().addVectors(p0, jupPos).multiplyScalar(0.5);
+                        p1.y += 20;
+                    } else {
+                        p1 = new THREE.Vector3().addVectors(p0, p2).multiplyScalar(0.5);
+                        const dist = p0.distanceTo(p2);
+                        p1.y += (missionState.targetId === 'moon') ? 4 : dist * 0.22;
+                    }
+
+                    // Quadratic Bezier Interpolation
+                    const currentPos = new THREE.Vector3(
+                        Math.pow(1 - t, 2) * p0.x + 2 * (1 - t) * t * p1.x + Math.pow(t, 2) * p2.x,
+                        Math.pow(1 - t, 2) * p0.y + 2 * (1 - t) * t * p1.y + Math.pow(t, 2) * p2.y,
+                        Math.pow(1 - t, 2) * p0.z + 2 * (1 - t) * t * p1.z + Math.pow(t, 2) * p2.z
                     );
                     satMesh.position.copy(currentPos);
-                    
-                    let nextT = Math.min(1, t + 0.01);
-                    let lookPos = new THREE.Vector3(
-                        (1-nextT)*(1-nextT)*p0.x + 2*(1-nextT)*nextT*p1.x + nextT*nextT*p2.x,
-                        (1-nextT)*(1-nextT)*p0.y + 2*(1-nextT)*nextT*p1.y + nextT*nextT*p2.y,
-                        (1-nextT)*(1-nextT)*p0.z + 2*(1-nextT)*nextT*p1.z + nextT*nextT*p2.z
+
+                    // Forward orientation along tangent
+                    const nt = Math.min(1.0, t + 0.005);
+                    const nextPos = new THREE.Vector3(
+                        Math.pow(1 - nt, 2) * p0.x + 2 * (1 - nt) * nt * p1.x + Math.pow(nt, 2) * p2.x,
+                        Math.pow(1 - nt, 2) * p0.y + 2 * (1 - nt) * nt * p1.y + Math.pow(nt, 2) * p2.y,
+                        Math.pow(1 - nt, 2) * p0.z + 2 * (1 - nt) * nt * p1.z + Math.pow(nt, 2) * p2.z
                     );
-                    satMesh.lookAt(lookPos);
+                    satMesh.lookAt(nextPos);
                     satMesh.rotateX(Math.PI / 2);
 
-                    if (t < 0.2) { physicsState.mass -= 3.2; physicsState.velocity += 0.05; }
-                    else if (t > 0.8) { physicsState.phase = "Orbital Insertion Burn"; physicsState.mass -= 1.6; physicsState.velocity -= 0.02; }
-                    else { physicsState.phase = "Hohmann Transfer Coasting"; }
-
-                    let drag = (t < 0.05) ? 0.5 * ((0.05 - t) * 20) * (physicsState.velocity**2) * 2.5 : 0;
-                    
-                    document.getElementById('t-phase').innerText = physicsState.phase;
-                    document.getElementById('t-mass').innerText = Math.max(1200, physicsState.mass).toFixed(2);
-                    document.getElementById('t-vel').innerText = physicsState.velocity.toFixed(2);
-                    document.getElementById('t-drag').innerText = drag.toFixed(2);
-                } 
-                else {
-                    // FIXED: Seamless transition into orbit without snapping
-                    if (!physicsState.orbitInitialized) {
-                        physicsState.orbitAngle = Math.atan2(satMesh.position.z - targetMesh.position.z, satMesh.position.x - targetMesh.position.x);
-                        physicsState.orbitInitialized = true;
+                    // Propellant & Mass Consumption model
+                    let fuelBurned = 0;
+                    if (t < 0.25) {
+                        document.getElementById('t-phase').innerText = "Trans-Planetary Injection Burn";
+                        document.getElementById('t-burns').innerText = "Burn 1: ACTIVE (100%)";
+                        fuelBurned = missionState.propellantMass * 0.65 * (t / 0.25);
+                    } else if (t > 0.85) {
+                        document.getElementById('t-phase').innerText = "Retrograde Orbital Insertion Burn";
+                        document.getElementById('t-burns').innerText = "Burn 2: ACTIVE (100%)";
+                        fuelBurned = missionState.propellantMass * 0.65 + missionState.propellantMass * 0.35 * ((t - 0.85) / 0.15);
+                    } else {
+                        document.getElementById('t-phase').innerText = missionState.useGravityAssist ? "Jupiter Gravity Assist Slingshot" : "Helio-Centric Coasting Phase";
+                        document.getElementById('t-burns').innerText = "Main Engines Idle";
+                        fuelBurned = missionState.propellantMass * 0.65;
                     }
-                    
-                    physicsState.phase = "Stable Orbit Achieved";
-                    physicsState.orbitAngle += 0.03;
 
-                    satMesh.position.x = targetMesh.position.x + orbitRad * Math.cos(physicsState.orbitAngle);
-                    satMesh.position.z = targetMesh.position.z + orbitRad * Math.sin(physicsState.orbitAngle);
-                    satMesh.position.y = targetMesh.position.y + orbitRad * Math.sin(physicsState.orbitAngle) * 0.4; 
+                    const currentMass = missionState.dryMass + (missionState.propellantMass - fuelBurned);
+                    document.getElementById('t-mass').innerText = `${Math.round(currentMass).toLocaleString()} kg`;
+                    document.getElementById('t-fuel').innerText = `${Math.round(fuelBurned).toLocaleString()} kg`;
+                    document.getElementById('t-dist').innerText = `${(missionState.totalDistanceKm * t / 1e6).toFixed(2)} M km`;
+                    document.getElementById('t-vel').innerText = `${(32.5 - 14 * t).toFixed(2)} km/s`;
+
+                }
+                // PHASE 2: SMOOTH CAPTURE INTO STABLE ORBIT (No Snap / No Altitude Drop)
+                else {
+                    if (!missionState.insertionComplete) {
+                        // Capture initial entry angle seamlessly
+                        missionState.orbitAngle = Math.atan2(satMesh.position.z - targetMesh.position.z, satMesh.position.x - targetMesh.position.x);
+                        missionState.insertionComplete = true;
+                    }
+
+                    document.getElementById('t-phase').innerText = "Stable Parking Orbit Achieved";
+                    document.getElementById('t-burns').innerText = "Burns Completed (All Engines Shutdown)";
+                    document.getElementById('t-mass').innerText = `${missionState.dryMass.toLocaleString()} kg (Dry)`;
+                    document.getElementById('t-fuel').innerText = `${Math.round(missionState.propellantMass).toLocaleString()} kg (Expended)`;
+                    document.getElementById('t-dist').innerText = `${(missionState.totalDistanceKm / 1e6).toFixed(2)} M km (Final)`;
+                    document.getElementById('t-vel').innerText = "Orbital Velocity Locked";
+
+                    missionState.orbitAngle += 0.025;
+                    satMesh.position.x = targetMesh.position.x + safeOrbitAltitude * Math.cos(missionState.orbitAngle);
+                    satMesh.position.z = targetMesh.position.z + safeOrbitAltitude * Math.sin(missionState.orbitAngle);
+                    satMesh.position.y = targetMesh.position.y + safeOrbitAltitude * Math.sin(missionState.orbitAngle) * 0.25; // slight inclination
 
                     satMesh.lookAt(targetMesh.position);
                     satMesh.rotateX(Math.PI / 2);
-
-                    document.getElementById('t-phase').innerText = physicsState.phase;
-                    document.getElementById('t-vel').innerText = "7.66 (Orbital)";
                 }
 
-                physicsState.trailPoints.push(satMesh.position.clone());
-                trailLine.geometry.setFromPoints(physicsState.trailPoints);
+                // Append and update flight path trail
+                missionState.flightPoints.push(satMesh.position.clone());
+                flightTrail.geometry.setFromPoints(missionState.flightPoints);
             }
 
-            raycaster.setFromCamera(mouse, camera);
-            if(raycaster.intersectObjects(Object.values(planetMeshes)).length > 0) document.body.classList.add('pointing');
-            else document.body.classList.remove('pointing');
+            // AUTO-TRACKING CAMERA SMOOTH LERP
+            if (autoTracking) {
+                let focusPosition = new THREE.Vector3();
+                if (trackingTarget === "spacecraft" && satMesh) {
+                    focusPosition.copy(satMesh.position);
+                } else if (planetMeshes[trackingTarget]) {
+                    focusPosition.copy(planetMeshes[trackingTarget].position);
+                }
 
+                controls.target.lerp(focusPosition, 0.08);
+
+                // Dynamic zoom distance based on target scale
+                let targetDist = 70;
+                if (trackingTarget === "spacecraft") targetDist = 15;
+                else if (trackingTarget === "sun") targetDist = 200;
+                else if (["jupiter", "saturn", "uranus", "neptune"].includes(trackingTarget)) targetDist = 120;
+
+                const desiredCamPos = focusPosition.clone().add(new THREE.Vector3(0, targetDist * 0.5, targetDist));
+                camera.position.lerp(desiredCamPos, 0.04);
+            }
+
+            controls.update();
             renderer.render(scene, camera);
         }
 
+        // Initialize defaults
+        syncDate("2026-09-11");
+        setTracking("earth");
         animate();
 
         window.addEventListener('resize', () => {
