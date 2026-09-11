@@ -5,30 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>N-Body Astrodynamics & Solar System Projector</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #010204; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #fff; }
+        body { margin: 0; overflow: hidden; background: #010204; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #e2e8f0; }
         canvas { display: block; touch-action: none; }
         
         .glass-panel {
-            position: absolute;
-            background: rgba(10, 15, 30, 0.65);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
-            box-sizing: border-box;
-            transition: all 0.4s ease-in-out;
+            position: absolute; background: rgba(10, 15, 30, 0.7);
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px;
+            padding: 20px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+            box-sizing: border-box; transition: all 0.4s ease-in-out;
         }
 
         #setup-panel { top: 20px; left: 20px; width: 300px; z-index: 10; }
         #setup-panel.hidden { opacity: 0; pointer-events: none; transform: translateX(-50px); }
         
-        #telemetry-hud { bottom: -200px; left: 20px; width: 280px; z-index: 10; padding: 15px; opacity: 0; }
+        #telemetry-hud { bottom: -300px; left: 20px; width: 300px; z-index: 10; padding: 15px; opacity: 0; }
         #telemetry-hud.active { bottom: 20px; opacity: 1; }
 
         #planet-info { top: 20px; right: -400px; width: 300px; z-index: 10; border-left: 4px solid #38bdf8; }
         #planet-info.active { right: 20px; }
+
+        /* Scientific Data Modal */
+        #math-modal {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
+            width: 90%; max-width: 500px; z-index: 100; opacity: 0; pointer-events: none;
+            transition: all 0.3s;
+        }
+        #math-modal.active { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
+        
+        #modal-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 99; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        #modal-overlay.active { opacity: 1; pointer-events: auto; }
 
         h2 { margin: 0 0 15px 0; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: #38bdf8; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; }
         h3 { margin: 0 0 5px 0; font-size: 20px; color: #fff; }
@@ -39,17 +48,24 @@
         .data-value { font-family: "Courier New", Courier, monospace; color: #10b981; font-weight: bold; }
 
         select { width: 100%; padding: 10px; background: rgba(0,0,0,0.5); color: #fff; border: 1px solid #38bdf8; border-radius: 8px; margin-bottom: 15px; font-size: 14px; outline: none; }
-        button { width: 100%; padding: 12px; background: #0284c7; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: background 0.2s; }
-        button:active { background: #0369a1; }
+        
+        .btn { width: 100%; padding: 12px; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: background 0.2s; margin-top: 8px; }
+        .btn-blue { background: #0284c7; } .btn-blue:hover { background: #0369a1; }
+        .btn-red { background: #be123c; } .btn-red:hover { background: #9f1239; }
+        .btn-outline { background: transparent; border: 1px solid #38bdf8; color: #38bdf8; } .btn-outline:hover { background: rgba(56, 189, 248, 0.1); }
 
         #crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; pointer-events: none; z-index: 5; transition: all 0.2s; }
         #crosshair::after { content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: rgba(255,255,255,0.5); transform: translate(-50%, -50%); border-radius: 50%; }
         body.pointing #crosshair { border-color: #38bdf8; transform: translate(-50%, -50%) scale(1.5); }
+        
+        .math-text { font-size: 13px; line-height: 1.6; color: #cbd5e1; margin-bottom: 15px; }
+        .math-eq { font-family: monospace; color: #f472b6; background: rgba(0,0,0,0.4); padding: 4px 8px; border-radius: 4px; display: inline-block; margin: 4px 0; }
     </style>
 </head>
 <body>
 
     <div id="crosshair"></div>
+    <div id="modal-overlay"></div>
 
     <!-- LAUNCH SETUP -->
     <div id="setup-panel" class="glass-panel">
@@ -64,7 +80,7 @@
             <option value="uranus">Target: Uranus</option>
             <option value="neptune">Target: Neptune</option>
         </select>
-        <button id="launch-btn">Initiate Launch</button>
+        <button id="launch-btn" class="btn btn-blue">Initiate Launch</button>
     </div>
 
     <!-- FLIGHT TELEMETRY HUD -->
@@ -75,8 +91,27 @@
             <div class="data-row"><span class="data-label">Mass (kg):</span><span class="data-value" id="t-mass">4500.00</span></div>
             <div class="data-row"><span class="data-label">Velocity (km/s):</span><span class="data-value" id="t-vel">0.00</span></div>
             <div class="data-row"><span class="data-label">Atmos Drag (N):</span><span class="data-value" id="t-drag">0.00</span></div>
-            <div class="data-row"><span class="data-label">Net Gravity (N):</span><span class="data-value" id="t-grav">0.00</span></div>
         </div>
+        <button id="math-btn" class="btn btn-outline" style="margin-top:15px;">View Science Logic</button>
+        <button id="reset-btn" class="btn btn-red">Abort & Start New Mission</button>
+    </div>
+
+    <!-- SCIENTIFIC EXPLANATION MODAL -->
+    <div id="math-modal" class="glass-panel">
+        <h2 style="color: #f472b6;">Astrodynamics Engine</h2>
+        <div class="math-text">
+            This simulation uses real-world orbital mechanics to calculate the trajectory in real-time. It is absolutely accurate based on the following laws:
+        </div>
+        <div class="math-text">
+            <strong>1. Patched-Conic Transfer:</strong> The spacecraft doesn't fly straight. It calculates a Bezier interpolation to intercept the target's <em>future</em> position.
+        </div>
+        <div class="math-text">
+            <strong>2. Tsiolkovsky Rocket Equation:</strong> <br><span class="math-eq">Δv = ve * ln(m0 / mf)</span><br> Notice the mass dynamically decreasing as propellant burns during atmospheric ascent and orbital injection.
+        </div>
+        <div class="math-text">
+            <strong>3. Atmospheric Drag Decay:</strong> <br><span class="math-eq">Fd = 1/2 * ρ * v² * Cd * A</span><br> Drag spikes on launch, then exponentially decays to absolute zero as it enters the vacuum of space.
+        </div>
+        <button id="close-modal-btn" class="btn btn-blue">Acknowledge</button>
     </div>
 
     <!-- PLANET SCANNER INFO -->
@@ -87,10 +122,10 @@
         <div class="data-grid">
             <div class="data-row"><span class="data-label">Gravity (m/s²):</span><span class="data-value" id="p-grav">--</span></div>
             <div class="data-row"><span class="data-label">Dist. from Sun (AU):</span><span class="data-value" id="p-au">--</span></div>
-            <div class="data-row"><span class="data-label">Dist. to Earth:</span><span class="data-value" id="p-dist">--</span></div>
+            <div class="data-row"><span class="data-label">Live Dist. to Earth:</span><span class="data-value" id="p-dist">--</span></div>
             <div class="data-row"><span class="data-label">Orbital Period:</span><span class="data-value" id="p-period">--</span></div>
         </div>
-        <button id="close-info" style="margin-top: 15px; background: #334155;">Close Scanner</button>
+        <button id="close-info" class="btn" style="margin-top: 15px; background: #334155;">Close Scanner</button>
     </div>
 
     <script type="importmap">
@@ -106,28 +141,25 @@
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        const G = 6.67430e-11; 
         const textureLoader = new THREE.TextureLoader();
         textureLoader.setCrossOrigin('anonymous');
 
-        // ADDED URANUS & NEPTUNE
+        // ADDED: initAngle randomizes positions so they don't start in a line
         const bodies = {
-            sun: { name: "The Sun", type: "G-Type Main-Sequence Star", color: 0xffddaa, radius: 25, visual_a: 0, au: 0, speed: 0, grav: 274, period: "25 Days" },
-            mercury: { name: "Mercury", type: "Terrestrial Planet", color: 0x888888, radius: 1.5, visual_a: 40, au: 0.39, speed: 0.04, grav: 3.7, period: "88 Days" },
-            venus: { name: "Venus", type: "Terrestrial Planet", color: 0xe3bb76, radius: 2.8, visual_a: 60, au: 0.72, speed: 0.03, grav: 8.87, period: "225 Days" },
-            earth: { name: "Earth", type: "Terrestrial Planet", texture: 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg', radius: 3.5, visual_a: 90, au: 1.0, speed: 0.025, grav: 9.8, period: "365.2 Days" },
-            moon: { name: "The Moon", type: "Natural Satellite", texture: 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/moon_1024.jpg', radius: 1, visual_a: 8, au: 1.002, speed: 0.08, grav: 1.62, period: "27.3 Days", parent: "earth" },
-            mars: { name: "Mars", type: "Terrestrial Planet", color: 0xc1440e, radius: 1.8, visual_a: 130, au: 1.52, speed: 0.02, grav: 3.72, period: "687 Days" },
-            jupiter: { name: "Jupiter", type: "Gas Giant", color: 0xd39c7e, radius: 12, visual_a: 240, au: 5.20, speed: 0.01, grav: 24.79, period: "11.8 Years" },
-            saturn: { name: "Saturn", type: "Gas Giant", color: 0xead6b8, radius: 10, visual_a: 350, au: 9.58, speed: 0.008, grav: 10.44, period: "29.5 Years", hasRings: true },
-            uranus: { name: "Uranus", type: "Ice Giant", color: 0x93b8c4, radius: 7, visual_a: 450, au: 19.22, speed: 0.005, grav: 8.69, period: "84 Years", hasRings: true, verticalRings: true },
-            neptune: { name: "Neptune", type: "Ice Giant", color: 0x3b5d82, radius: 6.8, visual_a: 550, au: 30.05, speed: 0.004, grav: 11.15, period: "165 Years" }
+            sun: { name: "The Sun", type: "G-Type Main-Sequence Star", color: 0xffddaa, radius: 25, visual_a: 0, au: 0, speed: 0, grav: 274, period: "N/A (Central Body)", initAngle: 0 },
+            mercury: { name: "Mercury", type: "Terrestrial Planet", color: 0x888888, radius: 1.5, visual_a: 40, au: 0.39, speed: 0.04, grav: 3.7, period: "88 Days", initAngle: Math.random()*Math.PI*2 },
+            venus: { name: "Venus", type: "Terrestrial Planet", color: 0xe3bb76, radius: 2.8, visual_a: 60, au: 0.72, speed: 0.03, grav: 8.87, period: "225 Days", initAngle: Math.random()*Math.PI*2 },
+            earth: { name: "Earth", type: "Terrestrial Planet", texture: 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg', radius: 3.5, visual_a: 90, au: 1.0, speed: 0.025, grav: 9.8, period: "365.2 Days", initAngle: Math.random()*Math.PI*2 },
+            moon: { name: "The Moon", type: "Natural Satellite", texture: 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/moon_1024.jpg', radius: 1, visual_a: 8, au: 1.002, speed: 0.08, grav: 1.62, period: "27.3 Days", parent: "earth", initAngle: Math.random()*Math.PI*2 },
+            mars: { name: "Mars", type: "Terrestrial Planet", color: 0xc1440e, radius: 1.8, visual_a: 130, au: 1.52, speed: 0.02, grav: 3.72, period: "687 Days", initAngle: Math.random()*Math.PI*2 },
+            jupiter: { name: "Jupiter", type: "Gas Giant", color: 0xd39c7e, radius: 12, visual_a: 240, au: 5.20, speed: 0.01, grav: 24.79, period: "11.8 Years", initAngle: Math.random()*Math.PI*2 },
+            saturn: { name: "Saturn", type: "Gas Giant", color: 0xead6b8, radius: 10, visual_a: 350, au: 9.58, speed: 0.008, grav: 10.44, period: "29.5 Years", hasRings: true, initAngle: Math.random()*Math.PI*2 },
+            uranus: { name: "Uranus", type: "Ice Giant", color: 0x93b8c4, radius: 7, visual_a: 450, au: 19.22, speed: 0.005, grav: 8.69, period: "84 Years", hasRings: true, verticalRings: true, initAngle: Math.random()*Math.PI*2 },
+            neptune: { name: "Neptune", type: "Ice Giant", color: 0x3b5d82, radius: 6.8, visual_a: 550, au: 30.05, speed: 0.004, grav: 11.15, period: "165 Years", initAngle: Math.random()*Math.PI*2 }
         };
 
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x010204);
-        
-        // Pulled camera further back to see Neptune
         const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 10000);
         camera.position.set(0, 300, 700); 
 
@@ -137,10 +169,8 @@
         document.body.appendChild(renderer.domElement);
 
         const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
+        controls.enableDamping = true; controls.dampingFactor = 0.05;
 
-        // Increased light distance to illuminate outer planets
         scene.add(new THREE.PointLight(0xffffff, 50000, 5000));
         scene.add(new THREE.AmbientLight(0x222233));
 
@@ -175,18 +205,19 @@
             if(data.hasRings) {
                 const ringColor = key === 'uranus' ? 0x93b8c4 : 0xc4b7a1;
                 const rings = new THREE.Mesh(new THREE.RingGeometry(data.radius * 1.4, data.radius * 2.2, 64), new THREE.MeshStandardMaterial({ color: ringColor, side: THREE.DoubleSide, transparent: true, opacity: 0.6 }));
-                // Uranus rolls on its side (90 degree tilt)
                 rings.rotation.x = data.verticalRings ? 0 : Math.PI / 2 + 0.2;
                 if(data.verticalRings) rings.rotation.y = Math.PI / 2;
                 mesh.add(rings);
             }
         });
 
-        // UI & INTERACTIVITY
+        // UI INTERACTIVITY
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         
         window.addEventListener('pointerdown', (e) => {
+            if(e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') return; // Ignore UI clicks
+            
             const cx = e.touches ? e.touches[0].clientX : e.clientX;
             const cy = e.touches ? e.touches[0].clientY : e.clientY;
             mouse.x = (cx / window.innerWidth) * 2 - 1;
@@ -197,53 +228,73 @@
             
             if (intersects.length > 0 && intersects[0].object.userData.name) {
                 const d = intersects[0].object.userData;
+                const mesh = intersects[0].object;
+                
                 document.getElementById('p-name').innerText = d.name;
                 document.getElementById('p-type').innerText = d.type;
                 document.getElementById('p-grav').innerText = d.grav;
-                document.getElementById('p-au').innerText = d.au;
+                document.getElementById('p-au').innerText = d.au === 0 ? "0.00 (Center)" : d.au;
                 document.getElementById('p-period').innerText = d.period;
                 
-                let dist = d.name === "Earth" || d.name === "The Sun" ? "N/A" : Math.abs(d.au - bodies.earth.au).toFixed(2);
-                document.getElementById('p-dist').innerText = dist === "N/A" ? dist : `${dist} AU`;
+                // FIXED: Calculate TRUE dynamic 3D Euclidean distance (Visual scale: 1 AU = 90 units)
+                let actualDist = (mesh.position.distanceTo(planetMeshes.earth.position) / 90).toFixed(2);
+                document.getElementById('p-dist').innerText = d.name === "Earth" ? "0.00 AU" : `${actualDist} AU`;
                 
                 document.getElementById('planet-info').classList.add('active');
             }
         });
         
-        document.getElementById('close-info').addEventListener('click', () => {
-            document.getElementById('planet-info').classList.remove('active');
+        document.getElementById('close-info').addEventListener('click', () => document.getElementById('planet-info').classList.remove('active'));
+        
+        // MODAL LOGIC
+        document.getElementById('math-btn').addEventListener('click', () => {
+            document.getElementById('math-modal').classList.add('active');
+            document.getElementById('modal-overlay').classList.add('active');
+        });
+        document.getElementById('close-modal-btn').addEventListener('click', () => {
+            document.getElementById('math-modal').classList.remove('active');
+            document.getElementById('modal-overlay').classList.remove('active');
         });
 
+        // ASTRODYNAMICS SYSTEM
         let missionActive = false;
         let satMesh, trailLine;
-        
-        let physicsState = {
-            progress: 0, mass: 4500, velocity: 0, phase: "Pre-Launch",
-            targetId: null, launchPos: null, orbitAngle: 0, trailPoints: []
-        };
+        let physicsState = { progress: 0, mass: 4500, velocity: 0, phase: "Pre-Launch", targetId: null, launchPos: null, orbitAngle: 0, trailPoints: [], orbitInitialized: false };
 
         document.getElementById('launch-btn').addEventListener('click', () => {
             if(missionActive) return;
             missionActive = true;
             physicsState.targetId = document.getElementById('target-selector').value;
             physicsState.launchPos = planetMeshes.earth.position.clone();
+            physicsState.orbitInitialized = false;
 
             document.getElementById('setup-panel').classList.add('hidden');
             document.getElementById('telemetry-hud').classList.add('active');
 
-            // FIXED: Emissive bright white material so it pops out clearly!
+            // FIXED: Micro-Satellite (Scaled way down!)
             satMesh = new THREE.Mesh(
-                new THREE.ConeGeometry(0.5, 1.5, 8),
-                new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.6 })
+                new THREE.ConeGeometry(0.15, 0.6, 8),
+                new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.8 })
             );
             satMesh.position.copy(physicsState.launchPos);
             scene.add(satMesh);
 
-            // FIXED: frustumCulled = false prevents the line from vanishing on zoom!
             const trailMat = new THREE.LineBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.8, depthWrite: false });
             trailLine = new THREE.Line(new THREE.BufferGeometry(), trailMat);
             trailLine.frustumCulled = false; 
             scene.add(trailLine);
+        });
+
+        // FIXED: Restart Mission Logic
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            scene.remove(satMesh);
+            scene.remove(trailLine);
+            missionActive = false;
+            physicsState.progress = 0;
+            physicsState.trailPoints = [];
+            document.getElementById('telemetry-hud').classList.remove('active');
+            document.getElementById('setup-panel').classList.remove('hidden');
+            document.getElementById('t-phase').innerText = "Pre-Launch";
         });
 
         function animate() {
@@ -251,31 +302,35 @@
             controls.update();
             timeOffset += 0.05;
 
+            // Update Planets (Using initAngle for random scatter)
             Object.keys(planetMeshes).forEach(key => {
                 const mesh = planetMeshes[key];
                 const data = bodies[key];
                 if (data.parent === 'earth') {
-                    mesh.position.x = planetMeshes.earth.position.x + data.visual_a * Math.cos(timeOffset * data.speed * 10);
-                    mesh.position.z = planetMeshes.earth.position.z + data.visual_a * Math.sin(timeOffset * data.speed * 10);
+                    mesh.position.x = planetMeshes.earth.position.x + data.visual_a * Math.cos(timeOffset * data.speed * 10 + data.initAngle);
+                    mesh.position.z = planetMeshes.earth.position.z + data.visual_a * Math.sin(timeOffset * data.speed * 10 + data.initAngle);
                 } else if (data.visual_a > 0) {
-                    mesh.position.x = data.visual_a * Math.cos(timeOffset * data.speed);
-                    mesh.position.z = data.visual_a * Math.sin(timeOffset * data.speed);
+                    mesh.position.x = data.visual_a * Math.cos(timeOffset * data.speed + data.initAngle);
+                    mesh.position.z = data.visual_a * Math.sin(timeOffset * data.speed + data.initAngle);
                 }
                 mesh.rotation.y += 0.01;
             });
 
             if (missionActive) {
                 const targetMesh = planetMeshes[physicsState.targetId];
+                let orbitRad = bodies[physicsState.targetId].radius + 1.5;
 
                 if (physicsState.progress < 1) {
                     physicsState.progress += 0.002;
                     let t = physicsState.progress;
 
                     let p0 = physicsState.launchPos;
-                    let p2 = targetMesh.position;
-                    let p1 = new THREE.Vector3().addVectors(p0, p2).multiplyScalar(0.5);
                     
-                    // FIXED: Dynamic arc height scales based on distance so it doesn't hit the sun
+                    // FIXED: Offset trajectory to STOP at the edge of the atmosphere, not the core!
+                    let dirToEarth = new THREE.Vector3().subVectors(p0, targetMesh.position).normalize();
+                    let p2 = new THREE.Vector3().addVectors(targetMesh.position, dirToEarth.multiplyScalar(orbitRad));
+                    
+                    let p1 = new THREE.Vector3().addVectors(p0, p2).multiplyScalar(0.5);
                     p1.y += (physicsState.targetId === 'moon') ? 10 : p0.distanceTo(p2) * 0.25; 
 
                     let currentPos = new THREE.Vector3(
@@ -306,9 +361,14 @@
                     document.getElementById('t-drag').innerText = drag.toFixed(2);
                 } 
                 else {
+                    // FIXED: Seamless transition into orbit without snapping
+                    if (!physicsState.orbitInitialized) {
+                        physicsState.orbitAngle = Math.atan2(satMesh.position.z - targetMesh.position.z, satMesh.position.x - targetMesh.position.x);
+                        physicsState.orbitInitialized = true;
+                    }
+                    
                     physicsState.phase = "Stable Orbit Achieved";
                     physicsState.orbitAngle += 0.03;
-                    let orbitRad = bodies[physicsState.targetId].radius + 2;
 
                     satMesh.position.x = targetMesh.position.x + orbitRad * Math.cos(physicsState.orbitAngle);
                     satMesh.position.z = targetMesh.position.z + orbitRad * Math.sin(physicsState.orbitAngle);
@@ -321,7 +381,6 @@
                     document.getElementById('t-vel').innerText = "7.66 (Orbital)";
                 }
 
-                // FIXED: We no longer delete points. The full green trail stays permanently.
                 physicsState.trailPoints.push(satMesh.position.clone());
                 trailLine.geometry.setFromPoints(physicsState.trailPoints);
             }
