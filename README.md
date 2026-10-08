@@ -1,12 +1,13 @@
-# 3D Spacecraft Orbit & Solar System Simulator
+# N-Body Astrodynamics & Spacecraft Trajectory Engine
 
-Hi! This is an interactive 3D simulation of our Solar System, made entirely in JavaScript and WebGL. It allows you to select a real date (from 2026 to 2028), pick a planet, and launch a satellite from Earth to go and orbit that planet!
+An interactive, computationally rigorous 3D orbital simulation modeled in WebGL (Three.js). This engine computes multi-body planetary positions and executes interplanetary spacecraft transfers using authentic NASA JPL Keplerian elements for the 2026–2028 epoch.
 
-## 🚀 Play with it here:
+## 🔭 Live Simulation Dashboard
 https://garvit1230.github.io/solar-system-sim/
 
-## 🧠 How it works (The Physics)
-* **Real Planet Positions:** Instead of running on simple loops, the planets are exactly where NASA says they will be on any date between 2026 and 2028 based on Keplerian Orbit Equations.
-* **Real Rocket Science:** The satellite burns "fuel" and loses weight as it travels, calculated using the Tsiolkovsky Rocket Equation.
-* **Real Flight Paths:** It calculates a curved journey (called a Hohmann transfer) to intercept the target planet while it moves, rather than aiming at where it was at launch.
-* **Real Orbital Insertion:** When the ship arrives, it doesn't just stop or snap to a path; it fires its brakes to be captured by the planet's gravity.
+## ⚙️ Mathematical & Physical Architecture
+
+* **J2000 Ephemeris Propagation:** Calculates true elliptical orbits using Kepler's transcendental equations rather than fixed circular approximations, ensuring planetary spatial coordinates match real-world NASA JPL data.
+* **Tsiolkovsky Propulsion Dynamics:** Simulates active mass depletion and continuous fuel expenditure based on specific impulse parameters for both Chemical and Ion thrusters.
+* **Patched-Conic Trajectories:** Executes dynamic Hohmann transfer orbits to intercept the target's future coordinates, incorporating variable atmospheric drag modeling during the launch ascent.
+* **Tangential Orbital Capture:** Calculates a seamless state-vector transition at the destination's sphere of influence (SOI), executing a precise retrograde insertion burn to achieve a stable parking orbit without spatial clipping.
